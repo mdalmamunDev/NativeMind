@@ -4,32 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import config from '@/config';
-
-const STORAGE_KEY = 'nativemind_conversation';
-
-function loadFromStorage(): { messages: Message[]; context: number[] } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        messages: parsed.messages || [],
-        context: parsed.context || [],
-      };
-    }
-  } catch {
-    // ignore corrupt data
-  }
-  return { messages: [], context: [] };
-}
-
-function saveToStorage(messages: Message[], context: number[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ messages, context }));
-  } catch {
-    // storage full or unavailable
-  }
-}
+import { clearStorage, loadFromStorage, saveToStorage } from './utils/Storage';
 
 const suggestedPrompts = [
   'Explain quantum computing simply',
@@ -90,7 +65,7 @@ export default function App() {
   const clearConversation = useCallback(() => {
     setMessages([]);
     contextRef.current = [];
-    localStorage.removeItem(STORAGE_KEY);
+    clearStorage();
   }, []);
 
   const handleSend = async () => {
@@ -208,7 +183,7 @@ export default function App() {
         )}
       </header>
 
-{/* Chat area */}
+      {/* Chat area */}
       <main ref={chatRef} className="flex-1 overflow-y-auto relative" onScroll={handleScroll}>
         {isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center px-6">
