@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles } from 'lucide-react';
 import axios from 'axios';
-
-// Add imports at the top
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import config from '@/config';
 
 
 const suggestedPrompts = [
@@ -22,6 +21,7 @@ export default function App() {
 
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const contextRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (chatRef.current) {
@@ -36,15 +36,16 @@ export default function App() {
   const aiReply = async (userMessage: string) => {
     try {
       const response = await axios.post(
-        'http://localhost:11434/api/generate',
+        `${config.botUrl}/api/generate`,
         {
-          "model": "qwen2.5-coder:latest",
-          // model: "deepseek-coder:latest",
+          model: config.model,
           prompt: userMessage,
+          context: contextRef.current,
           stream: false
         }
       );
       const botRes: BotResponse = response.data;
+      contextRef.current = botRes.context;
       return botRes.response;
     } catch (error) {
       console.error(error);
@@ -132,8 +133,8 @@ export default function App() {
               >
                 <div
                   className={`max-w-[80%] rounded-3xl px-5 py-3 text-[15px] leading-relaxed ${message.role === 'user'
-                      ? 'rounded-br-md bg-zinc-900 text-white'
-                      : 'rounded-bl-md bg-zinc-100 text-zinc-900'
+                    ? 'rounded-br-md bg-zinc-900 text-white'
+                    : 'rounded-bl-md bg-zinc-100 text-zinc-900'
                     }`}
                 >
                   <ReactMarkdown
