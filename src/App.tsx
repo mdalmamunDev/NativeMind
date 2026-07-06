@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles } from 'lucide-react';
+import { Send, Sparkles, ArrowDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -43,6 +43,7 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>(saved.messages);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -53,11 +54,34 @@ export default function App() {
     saveToStorage(messages, contextRef.current);
   }, [messages]);
 
+  // Auto-scroll to bottom when messages change (only if already at bottom)
   useEffect(() => {
-    if (chatRef.current) {
-      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    const chatElement = chatRef.current;
+    if (chatElement && !showScrollButton) {
+      chatElement.scrollTop = chatElement.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, showScrollButton]);
+
+  // Handle scroll events to show/hide scroll button
+  const handleScroll = useCallback(() => {
+    const chatElement = chatRef.current;
+    if (chatElement) {
+      const { scrollTop, scrollHeight, clientHeight } = chatElement;
+      const isAtBottom = scrollHeight - scrollTop <= clientHeight + 100;
+      setShowScrollButton(!isAtBottom);
+    }
+  }, []);
+
+  // Smooth scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    const chatElement = chatRef.current;
+    if (chatElement) {
+      chatElement.scrollTo({
+        top: chatElement.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -184,8 +208,8 @@ export default function App() {
         )}
       </header>
 
-      {/* Chat area */}
-      <main ref={chatRef} className="flex-1 overflow-y-auto">
+{/* Chat area */}
+      <main ref={chatRef} className="flex-1 overflow-y-auto relative" onScroll={handleScroll}>
         {isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center px-6">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900">
@@ -216,7 +240,7 @@ export default function App() {
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[80%] rounded-3xl px-5 py-3 text-[15px] leading-relaxed ${message.role === 'user'
+                  className={`max-w-[100%] rounded-3xl px-5 py-3 text-[15px] leading-relaxed ${message.role === 'user'
                     ? 'rounded-br-md bg-zinc-900 text-white'
                     : 'rounded-bl-md bg-zinc-100 text-zinc-900'
                     }`}
@@ -262,6 +286,17 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Scroll to bottom button */}
+      {!isEmpty && showScrollButton && (
+        <button
+          onClick={scrollToBottom}
+          className="absolute bottom-24 right-8 flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg transition-all hover:bg-zinc-700 animate-fadeIn"
+          aria-label="Scroll to bottom"
+        >
+          <ArrowDown className="h-5 w-5" />
+        </button>
+      )}
 
       {/* Input */}
       <footer className="border-t border-zinc-100 px-4 py-4">
