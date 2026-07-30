@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, ArrowDown } from 'lucide-react';
+import { Send, Sparkles, ArrowDown, Database } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import config from '@/config';
 import { clearStorage, loadFromStorage, saveToStorage } from './utils/Storage';
+import { fetchAllDbs, getDbList } from './utils/db';
 import EmptyArea from './components/EmptyArea';
 
 export default function App() {
@@ -13,10 +14,13 @@ export default function App() {
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [dbMode, setDbMode] = useState(false);
 
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const contextRef = useRef<number[]>(saved.context);
+  const dbDataRef = useRef<Record<string, unknown[]> | null>(null);
+  const dbLoadingRef = useRef(false);
 
   // Persist messages + context whenever they change
   useEffect(() => {
@@ -56,6 +60,21 @@ export default function App() {
     inputRef.current?.focus();
   }, []);
 
+  // Preload all database data when dbMode is toggled on
+  useEffect(() => {
+    if (dbMode && !dbDataRef.current && !dbLoadingRef.current) {
+      dbLoadingRef.current = true;
+      fetchAllDbs()
+        .then((data) => {
+          dbDataRef.current = data;
+        })
+        .catch(console.error)
+        .finally(() => {
+          dbLoadingRef.current = false;
+        });
+    }
+  }, [dbMode]);
+
   const clearConversation = useCallback(() => {
     setMessages([]);
     contextRef.current = [];
@@ -81,13 +100,34 @@ export default function App() {
     setInput('');
     setIsStreaming(true);
 
+    // Build the prompt — prepend database context if dbMode is on
+    let prompt = userMessage.content;
+    if (dbMode && dbDataRef.current) {
+      const dbList = getDbList();
+      const dbContext = dbList
+        .map((db) => {
+          const data = dbDataRef.current![db.name];
+          return `=== ${db.name} (${db.description}) ===\n${JSON.stringify(data, null, 2)}`;
+        })
+        .join('\n\n');
+
+      prompt = `You are a data analyst. Below is the students database.\n` +
+        `Analyze the data and answer the user's question. Always respond in a structured format:\n` +
+        `- Use **markdown tables** for tabular data\n` +
+        `- Use **bullet points** for lists and summaries\n` +
+        `- Use **headings** to organize sections\n` +
+        `- Highlight key numbers, trends, and insights\n\n` +
+        `--- STUDENTS DATABASE ---\n${dbContext}\n\n` +
+        `--- USER QUESTION ---\n${userMessage.content}`;
+    }
+
     try {
       const response = await fetch(`${config.botUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: config.model,
-          prompt: userMessage.content,
+          prompt,
           context: contextRef.current,
           stream: true,
         }),
@@ -161,6 +201,20 @@ export default function App() {
     <div className="flex h-screen flex-col bg-white text-zinc-900">
       {/* Header */}
       <header className="flex h-16 items-center justify-between border-b border-zinc-100 px-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setDbMode((prev) => !prev)}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+              dbMode
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'
+            }`}
+            title={dbMode ? 'Database mode is ON — all DB data is sent as context' : 'Toggle database mode ON'}
+          >
+            <Database className={`h-3.5 w-3.5 ${dbMode ? 'text-emerald-600' : ''}`} />
+            {dbMode ? 'DB On' : 'DB Off'}
+          </button>
+        </div>
         <div className="flex flex-1 items-center justify-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-zinc-900">
             <Sparkles className="h-4 w-4 text-white" />
