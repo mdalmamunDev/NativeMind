@@ -4,15 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "node init && vite",
+    "build": "node init && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",
     "axios": "^1.18.0",
     "clsx": "2.1.1",
+    "dotenv": "^8.2.0",
     "lucide-react": "^1.21.0",
+    "node-fetch": "^3.3.2",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-markdown": "^10.1.0",
